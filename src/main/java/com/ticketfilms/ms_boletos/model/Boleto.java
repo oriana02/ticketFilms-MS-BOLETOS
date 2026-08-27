@@ -23,10 +23,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-// Mapea 1:1 la tabla `boleto` de ms-boletos-schema.sql (RF-10, RF-11, RF-12).
+
 // funcion_id y evento_id son referencias LÓGICAS a ms-cartelera (sin FK real
 // entre microservicios, ver notas del schema). titulo_evento y
-// fecha_hora_funcion viven denormalizados acá para que "Mis boletos" (RF-12)
+// fecha_hora_funcion viven denormalizados acá para que "Mis boletos" 
 // no dependa de que ms-cartelera siga teniendo esos datos vivos.
 @Entity
 @Table(
@@ -51,7 +51,7 @@ public class Boleto {
     @Column(name = "codigo_boleto", nullable = false, length = 20)
     private String codigoBoleto;
 
-    // sub / email del JWT validado por el Resource Server (RF-02/RF-14)
+    // sub / email del JWT validado por el Resource Server 
     @Column(name = "usuario_id", nullable = false, length = 255)
     private String usuarioId;
 

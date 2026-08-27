@@ -21,10 +21,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-// Mapea 1:1 la tabla `boleto_asiento`. asiento_id es referencia lógica a
+// asiento_id es referencia lógica a
 // ms-asientos; fila/numero/categoria/precio_pagado van denormalizados como
 // snapshot de la compra, para que el historial no cambie si el mapa de
-// asientos de ms-asientos se regenera después.
+// asientos de ms-asientos se regenera después
 @Entity
 @Table(
         name = "boleto_asiento",

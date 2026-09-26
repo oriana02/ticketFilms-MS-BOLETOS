@@ -8,7 +8,7 @@ import org.springframework.web.client.RestClient;
 @Configuration
 public class RestClientConfig {
 
-    //URL base de ms-asientos
+    // URL base de ms-asientos
     @Value("${ms-asientos.base-url}")
     private String msAsientosBaseUrl;
 

@@ -23,7 +23,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-
 // funcion_id y evento_id son referencias LÓGICAS a ms-cartelera (sin FK real
 // entre microservicios, ver notas del schema). titulo_evento y
 // fecha_hora_funcion viven denormalizados acá para que "Mis boletos" 
@@ -90,4 +89,26 @@ public class Boleto {
         asiento.setBoleto(this);
         this.asientos.add(asiento);
     }
+
+    @Column(name = "tipo_evento", length = 30)
+    private String tipoEvento;
+
+    @Column(name = "sede", length = 150)
+    private String sede;
+
+    @Column(name = "ciudad", length = 80)
+    private String ciudad;
+
+    @Column(name = "puerta", length = 30)
+    private String puerta;
+
+    @OneToMany(mappedBy = "boleto", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<BoletoEntradaGeneral> entradasGenerales = new ArrayList<>();
+
+    public void agregarEntradaGeneral(BoletoEntradaGeneral entrada) {
+        entrada.setBoleto(this);
+        this.entradasGenerales.add(entrada);
+    }
+
 }

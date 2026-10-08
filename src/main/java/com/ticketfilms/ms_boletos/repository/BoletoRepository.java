@@ -12,11 +12,11 @@ import com.ticketfilms.ms_boletos.model.EstadoBoleto;
 public interface BoletoRepository extends JpaRepository<Boleto, Long> {
 
     //historial de boletos del usuario autenticado (usuarioId = sub/email del JWT)
-    @EntityGraph(attributePaths = "asientos")
+    @EntityGraph(attributePaths = {"asientos", "entradasGenerales"})
     List<Boleto> findByUsuarioIdOrderByFechaCompraDesc(String usuarioId);
 
     //pantalla de confirmación de compra / lectura de QR (código público del boleto)
-    @EntityGraph(attributePaths = "asientos")
+    @EntityGraph(attributePaths = {"asientos", "entradasGenerales"})
     Optional<Boleto> findByCodigoBoleto(String codigoBoleto);
 
     //usado al generar el código aleatorio, para reintentar si ya existe

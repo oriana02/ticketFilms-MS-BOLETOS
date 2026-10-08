@@ -1,6 +1,7 @@
 package com.ticketfilms.ms_boletos.service;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -11,14 +12,17 @@ import com.ticketfilms.ms_boletos.client.AsientosClient;
 import com.ticketfilms.ms_boletos.dto.AsientoCompraDto;
 import com.ticketfilms.ms_boletos.dto.BoletoResponseDto;
 import com.ticketfilms.ms_boletos.dto.ConfirmarCompraRequestDto;
+import com.ticketfilms.ms_boletos.dto.EntradaGeneralDto;
 import com.ticketfilms.ms_boletos.exception.BoletoNoEncontradoException;
 import com.ticketfilms.ms_boletos.exception.CategoriaInvalidaException;
 import com.ticketfilms.ms_boletos.model.Boleto;
 import com.ticketfilms.ms_boletos.model.BoletoAsiento;
+import com.ticketfilms.ms_boletos.model.BoletoEntradaGeneral;
 import com.ticketfilms.ms_boletos.model.CategoriaAsiento;
 import com.ticketfilms.ms_boletos.model.EstadoBoleto;
 import com.ticketfilms.ms_boletos.repository.BoletoRepository;
 import com.ticketfilms.ms_boletos.service.support.CodigoBoletoGenerator;
+import com.ticketfilms.ms_boletos.service.support.PrecioValidator;
 
 import lombok.RequiredArgsConstructor;
 
@@ -30,15 +34,20 @@ public class BoletoService {
     private final CodigoBoletoGenerator codigoBoletoGenerator;
     private final AsientosClient asientosClient;
     private final TransactionTemplate transactionTemplate;
+    private final PrecioValidator precioValidator;
 
     // Sin @Transactional a propósito: cada paso usa su propia transacción
     // (TransactionTemplate) para que el estado del boleto quede guardado
     // aunque falle un paso posterior.
     public BoletoResponseDto confirmarCompra(String usuarioId, String bearerToken, ConfirmarCompraRequestDto request) {
 
-        List<AsientoCompraDto> asientosDto = request.getAsientos();
-        if (asientosDto == null || asientosDto.isEmpty()) {
-            throw new IllegalArgumentException("La compra debe incluir al menos un asiento");
+        List<AsientoCompraDto> asientosDto
+                = request.getAsientos() != null ? request.getAsientos() : new ArrayList<>();
+        List<EntradaGeneralDto> generalesDto
+                = request.getEntradasGenerales() != null ? request.getEntradasGenerales() : new ArrayList<>();
+
+        if (asientosDto.isEmpty() && generalesDto.isEmpty()) {
+            throw new IllegalArgumentException("La compra debe incluir al menos un asiento o una entrada");
         }
 
         List<Long> asientoIds = asientosDto.stream()
@@ -46,13 +55,17 @@ public class BoletoService {
                 .collect(Collectors.toList());
 
         // Paso 1: construir (valida categorías y precios) y guardar como PENDIENTE
-        Boleto boleto = construirBoleto(usuarioId, request, asientosDto);
+        Boleto boleto = construirBoleto(usuarioId, request, asientosDto, generalesDto);
         String codigo = boleto.getCodigoBoleto();
         transactionTemplate.execute(status -> boletoRepository.save(boleto));
 
-        // Paso 2: confirmar los asientos en ms-asientos
+        // Paso 2: confirmar en ms-asientos
         try {
-            asientosClient.confirmarAsientos(bearerToken, request.getFuncionId(), asientoIds);
+            if (!asientoIds.isEmpty()) {
+                asientosClient.confirmarAsientos(bearerToken, request.getFuncionId(), asientoIds);
+            }
+            // TODO: confirmar las entradas generales (descontar del aforo) cuando
+            // ms-asientos tenga ese endpoint. Se llamaría aquí con generalesDto.
         } catch (RuntimeException e) {
             cambiarEstado(codigo, EstadoBoleto.CANCELADO);
             throw e;
@@ -68,10 +81,21 @@ public class BoletoService {
     }
 
     private Boleto construirBoleto(String usuarioId, ConfirmarCompraRequestDto request,
-                                   List<AsientoCompraDto> asientosDto) {
-        BigDecimal total = asientosDto.stream()
+            List<AsientoCompraDto> asientosDto,
+            List<EntradaGeneralDto> generalesDto) {
+        asientosDto.forEach(a -> precioValidator.validar(a.getCategoria(), a.getPrecio()));
+
+        BigDecimal totalAsientos = asientosDto.stream()
                 .map(AsientoCompraDto::getPrecio)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalGenerales = generalesDto.stream()
+                .map(g -> g.getPrecioUnitario().multiply(BigDecimal.valueOf(g.getCantidad())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        int cantidadGenerales = generalesDto.stream()
+                .mapToInt(EntradaGeneralDto::getCantidad)
+                .sum();
 
         Boleto boleto = Boleto.builder()
                 .codigoBoleto(codigoBoletoGenerator.generar())
@@ -80,8 +104,12 @@ public class BoletoService {
                 .eventoId(request.getEventoId())
                 .tituloEvento(request.getTituloEvento())
                 .fechaHoraFuncion(request.getFechaHoraFuncion())
-                .precioTotal(total)
-                .cantidadAsientos(asientosDto.size())
+                .tipoEvento(request.getTipoEvento())
+                .sede(request.getSede())
+                .ciudad(request.getCiudad())
+                .puerta(request.getPuerta())
+                .precioTotal(totalAsientos.add(totalGenerales))
+                .cantidadAsientos(asientosDto.size() + cantidadGenerales)
                 .estado(EstadoBoleto.PENDIENTE)
                 .build();
 
@@ -92,6 +120,18 @@ public class BoletoService {
                         .numero(a.getNumero())
                         .categoria(parsearCategoria(a.getCategoria()))
                         .precioPagado(a.getPrecio())
+                        .sector(a.getSector())
+                        .tipoAcceso(a.getTipoAcceso())
+                        .build()
+        ));
+
+        generalesDto.forEach(g -> boleto.agregarEntradaGeneral(
+                BoletoEntradaGeneral.builder()
+                        .sectorId(g.getSectorId())
+                        .sector(g.getSector())
+                        .tipoAcceso(g.getTipoAcceso())
+                        .cantidad(g.getCantidad())
+                        .precioUnitario(g.getPrecioUnitario())
                         .build()
         ));
         return boleto;
@@ -109,8 +149,8 @@ public class BoletoService {
     }
 
     private void cambiarEstado(String codigo, EstadoBoleto nuevoEstado) {
-        transactionTemplate.executeWithoutResult(status ->
-                boletoRepository.findByCodigoBoleto(codigo).ifPresent(b -> {
+        transactionTemplate.executeWithoutResult(status
+                -> boletoRepository.findByCodigoBoleto(codigo).ifPresent(b -> {
                     b.setEstado(nuevoEstado);
                     boletoRepository.save(b);
                 }));
@@ -134,17 +174,25 @@ public class BoletoService {
     }
 
     private BoletoResponseDto aResponseDto(Boleto boleto) {
+        List<String> entradas = boleto.getAsientos().stream()
+                .map(a -> a.getFila() + a.getNumero())
+                .collect(Collectors.toList());
+        boleto.getEntradasGenerales().forEach(g
+                -> entradas.add(g.getSector() + " x" + g.getCantidad()));
+
         return BoletoResponseDto.builder()
                 .codigoBoleto(boleto.getCodigoBoleto())
                 .tituloEvento(boleto.getTituloEvento())
                 .fechaHoraFuncion(boleto.getFechaHoraFuncion())
+                .tipoEvento(boleto.getTipoEvento())
+                .sede(boleto.getSede())
+                .ciudad(boleto.getCiudad())
+                .puerta(boleto.getPuerta())
                 .precioTotal(boleto.getPrecioTotal())
                 .cantidadAsientos(boleto.getCantidadAsientos())
                 .estado(boleto.getEstado().name())
                 .fechaCompra(boleto.getFechaCompra())
-                .asientos(boleto.getAsientos().stream()
-                        .map(a -> a.getFila() + a.getNumero())
-                        .collect(Collectors.toList()))
+                .asientos(entradas)
                 .build();
     }
 }

@@ -27,4 +27,8 @@ public class BoletoResponseDto {
     private String estado;
     private LocalDateTime fechaCompra;
     private List<String> asientos; // ej: ["F7", "F8"]
+    private String tipoEvento;
+    private String sede;
+    private String ciudad;
+    private String puerta;
 }

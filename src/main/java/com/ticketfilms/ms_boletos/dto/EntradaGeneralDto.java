@@ -2,6 +2,7 @@ package com.ticketfilms.ms_boletos.dto;
 
 import java.math.BigDecimal;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -12,24 +13,20 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class AsientoCompraDto {
+public class EntradaGeneralDto {
 
     @NotNull
-    private Long asientoId;
+    private Long sectorId;
 
     @NotNull
-    private String fila;
-
-    @NotNull
-    private Integer numero;
-
-    @NotNull
-    private String categoria; // "ESTANDAR" | "PREMIUM"
-
-    @NotNull
-    private BigDecimal precio;
-
-    private String sector; // opcional: "Cancha", etc.
+    private String sector;
 
     private String tipoAcceso; // opcional: GENERAL | VIP
+
+    @NotNull
+    @Min(1)
+    private Integer cantidad;
+
+    @NotNull
+    private BigDecimal precioUnitario;
 }

@@ -34,8 +34,10 @@ public class BoletoController {
     ) {
         String usuarioId = extraerUsuarioId(jwt);
         // Se reenvía el JWT crudo a ms-asientos para confirmar los asientos
-        // a nombre del mismo usuario que está comprando.
-        BoletoResponseDto boleto = boletoService.confirmarCompra(usuarioId, jwt.getTokenValue(), request);
+        // a nombre del mismo usuario que está comprando. El email viaja en el
+        // evento de Kafka para que ms-notificaciones sepa a quién escribirle.
+        BoletoResponseDto boleto = boletoService.confirmarCompra(
+                usuarioId, jwt.getClaimAsString("email"), jwt.getTokenValue(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(boleto);
     }
 

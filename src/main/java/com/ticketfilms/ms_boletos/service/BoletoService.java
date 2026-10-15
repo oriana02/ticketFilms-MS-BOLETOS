@@ -13,8 +13,11 @@ import com.ticketfilms.ms_boletos.dto.BoletoCompradoEvent;
 import com.ticketfilms.ms_boletos.dto.BoletoResponseDto;
 import com.ticketfilms.ms_boletos.dto.CompraFallidaEvent;
 import com.ticketfilms.ms_boletos.dto.ConfirmarCompraRequestDto;
+import com.ticketfilms.ms_boletos.exception.AsientoNoDisponibleException;
 import com.ticketfilms.ms_boletos.exception.BoletoNoEncontradoException;
 import com.ticketfilms.ms_boletos.exception.CategoriaInvalidaException;
+import com.ticketfilms.ms_boletos.exception.ReservaAjenaException;
+import com.ticketfilms.ms_boletos.exception.ReservaExpiradaException;
 import com.ticketfilms.ms_boletos.model.Boleto;
 import com.ticketfilms.ms_boletos.model.BoletoAsiento;
 import com.ticketfilms.ms_boletos.model.CategoriaAsiento;
@@ -60,8 +63,11 @@ public class BoletoService {
             asientosClient.confirmarAsientos(bearerToken, request.getFuncionId(), asientoIds);
         } catch (RuntimeException e) {
             cambiarEstado(codigo, EstadoBoleto.CANCELADO);
-            // Kafka: avisar que la compra falló (si Kafka falla, solo queda en el log)
-            eventPublisher.compraFallida(new CompraFallidaEvent(codigo, emailUsuario, e.getMessage()));
+            // Kafka: avisar que la compra falló (si Kafka falla, solo queda en el log).
+            // Sin email no hay a quién avisar, así que no se publica.
+            if (emailUsuario != null) {
+                eventPublisher.compraFallida(new CompraFallidaEvent(codigo, emailUsuario, motivoParaUsuario(e)));
+            }
             throw e;
         }
 
@@ -74,13 +80,15 @@ public class BoletoService {
         });
 
         // Paso 4: avisar por Kafka DESPUÉS de guardar. Si Kafka falla, la compra igual quedó bien.
-        eventPublisher.boletoComprado(new BoletoCompradoEvent(
-                respuesta.getCodigoBoleto(),
-                emailUsuario,
-                respuesta.getTituloEvento(),
-                respuesta.getFechaHoraFuncion(),
-                respuesta.getPrecioTotal(),
-                respuesta.getAsientos()));
+        if (emailUsuario != null) {
+            eventPublisher.boletoComprado(new BoletoCompradoEvent(
+                    respuesta.getCodigoBoleto(),
+                    emailUsuario,
+                    respuesta.getTituloEvento(),
+                    respuesta.getFechaHoraFuncion(),
+                    respuesta.getPrecioTotal(),
+                    respuesta.getAsientos()));
+        }
 
         return respuesta;
     }
@@ -124,6 +132,20 @@ public class BoletoService {
         } catch (IllegalArgumentException e) {
             throw new CategoriaInvalidaException(categoria);
         }
+    }
+
+    // Mensaje entendible para el usuario (no el cuerpo técnico que devuelve ms-asientos)
+    private String motivoParaUsuario(RuntimeException causa) {
+        if (causa instanceof ReservaExpiradaException) {
+            return "La reserva expiró";
+        }
+        if (causa instanceof ReservaAjenaException) {
+            return "La reserva pertenece a otro usuario";
+        }
+        if (causa instanceof AsientoNoDisponibleException) {
+            return "Los asientos ya no están disponibles";
+        }
+        return "No se pudo confirmar la compra por un problema del sistema";
     }
 
     private void cambiarEstado(String codigo, EstadoBoleto nuevoEstado) {

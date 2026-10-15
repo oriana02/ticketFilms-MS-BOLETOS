@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.ticketfilms.ms_boletos.client.UsuarioInfoClient;
 import com.ticketfilms.ms_boletos.dto.BoletoResponseDto;
 import com.ticketfilms.ms_boletos.dto.ConfirmarCompraRequestDto;
 import com.ticketfilms.ms_boletos.service.BoletoService;
@@ -26,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 public class BoletoController {
 
     private final BoletoService boletoService;
+    private final UsuarioInfoClient usuarioInfoClient;
 
     @PostMapping("/compra")
     public ResponseEntity<BoletoResponseDto> confirmarCompra(
@@ -33,11 +35,10 @@ public class BoletoController {
         @Valid @RequestBody ConfirmarCompraRequestDto request
     ) {
         String usuarioId = extraerUsuarioId(jwt);
+        String email = extraerEmail(jwt);
         // Se reenvía el JWT crudo a ms-asientos para confirmar los asientos
-        // a nombre del mismo usuario que está comprando. El email viaja en el
-        // evento de Kafka para que ms-notificaciones sepa a quién escribirle.
-        BoletoResponseDto boleto = boletoService.confirmarCompra(
-                usuarioId, jwt.getClaimAsString("email"), jwt.getTokenValue(), request);
+        // a nombre del mismo usuario que está comprando.
+        BoletoResponseDto boleto = boletoService.confirmarCompra(usuarioId, email, jwt.getTokenValue(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(boleto);
     }
 
@@ -60,5 +61,12 @@ public class BoletoController {
         String sub = jwt.getClaimAsString("sub");
         if (sub != null) return sub;
         return jwt.getClaimAsString("email");
+    }
+
+    // El access token de Cognito normalmente no trae "email": si falta, se pregunta a Cognito
+    private String extraerEmail(Jwt jwt) {
+        String email = jwt.getClaimAsString("email");
+        if (email != null) return email;
+        return usuarioInfoClient.obtenerEmail(jwt.getTokenValue());
     }
 }

@@ -65,9 +65,9 @@ public class BoletoService {
             cambiarEstado(codigo, EstadoBoleto.CANCELADO);
             // Kafka: avisar que la compra falló (si Kafka falla, solo queda en el log).
             // Sin email no hay a quién avisar, así que no se publica.
-            if (emailUsuario != null) {
-                eventPublisher.compraFallida(new CompraFallidaEvent(codigo, emailUsuario, motivoParaUsuario(e)));
-            }
+            eventPublisher.compraFallida(new CompraFallidaEvent(
+                    codigo, emailUsuario, motivoParaUsuario(e),
+                    request.getFuncionId(), asientoIds, usuarioId));
             throw e;
         }
 

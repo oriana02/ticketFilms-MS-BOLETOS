@@ -18,15 +18,41 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_HEAP_OPTS: "-Xmx512m -Xms512m"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
 
   # Pantalla web para ver los tópicos y mensajes (opcional, gratis)
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     ports:
       - "8090:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:19092
+
+  # ms-boletos en contenedor. Para usarlo desde VS Code en vez de Docker:
+  #   docker compose up -d kafka kafka-ui
+  ms-boletos:
+    build: .
+    container_name: ms-boletos
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xmx384m"
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      COGNITO_ISSUER_URI: ${COGNITO_ISSUER_URI}
+      COGNITO_USERINFO_URL: ${COGNITO_USERINFO_URL}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      ASIENTOS_BASE_URL: ${ASIENTOS_BASE_URL:-http://host.docker.internal:8082}

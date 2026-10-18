@@ -63,4 +63,10 @@ public class BoletoAsiento {
 
     @Column(name = "precio_pagado", nullable = false, precision = 10, scale = 2)
     private BigDecimal precioPagado;
+
+    @Column(name = "sector", length = 60)
+    private String sector;
+
+    @Column(name = "tipo_acceso", length = 20)
+    private String tipoAcceso; // GENERAL | VIP
 }

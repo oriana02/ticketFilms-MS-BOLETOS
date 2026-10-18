@@ -28,4 +28,8 @@ public class AsientoCompraDto {
 
     @NotNull
     private BigDecimal precio;
+
+    private String sector; // opcional: "Cancha", etc.
+
+    private String tipoAcceso; // opcional: GENERAL | VIP
 }

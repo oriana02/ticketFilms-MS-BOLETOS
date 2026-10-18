@@ -5,11 +5,15 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -23,10 +27,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-
 // funcion_id y evento_id son referencias LÓGICAS a ms-cartelera (sin FK real
 // entre microservicios, ver notas del schema). titulo_evento y
-// fecha_hora_funcion viven denormalizados acá para que "Mis boletos" 
+// fecha_hora_funcion viven denormalizados acá para que "Mis boletos"
 // no dependa de que ms-cartelera siga teniendo esos datos vivos.
 @Entity
 @Table(
@@ -51,7 +54,7 @@ public class Boleto {
     @Column(name = "codigo_boleto", nullable = false, length = 20)
     private String codigoBoleto;
 
-    // sub / email del JWT validado por el Resource Server 
+    // sub / email del JWT validado por el Resource Server
     @Column(name = "usuario_id", nullable = false, length = 255)
     private String usuarioId;
 
@@ -82,12 +85,37 @@ public class Boleto {
     @Builder.Default
     private LocalDateTime fechaCompra = LocalDateTime.now();
 
+    @Column(name = "tipo_evento", length = 30)
+    private String tipoEvento;
+
+    @Column(name = "sede", length = 150)
+    private String sede;
+
+    @Column(name = "ciudad", length = 80)
+    private String ciudad;
+
+    @Column(name = "puerta", length = 30)
+    private String puerta;
+
+    // asientos se trae con el @EntityGraph del repositorio.
     @OneToMany(mappedBy = "boleto", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<BoletoAsiento> asientos = new ArrayList<>();
 
+    // entradasGenerales se carga con una consulta aparte (SUBSELECT) para
+    // no chocar con asientos: Hibernate no permite traer dos listas a la vez.
+    @OneToMany(mappedBy = "boleto", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @Fetch(FetchMode.SUBSELECT)
+    @Builder.Default
+    private List<BoletoEntradaGeneral> entradasGenerales = new ArrayList<>();
+
     public void agregarAsiento(BoletoAsiento asiento) {
         asiento.setBoleto(this);
         this.asientos.add(asiento);
+    }
+
+    public void agregarEntradaGeneral(BoletoEntradaGeneral entrada) {
+        entrada.setBoleto(this);
+        this.entradasGenerales.add(entrada);
     }
 }

@@ -1,54 +1,12 @@
-# Clúster RabbitMQ de 2 nodos + ms-boletos.
-# Requiere la red compartida:  docker network create ticketfilms-net
+# Solo ms-boletos. Requiere los clústeres corriendo y la red compartida:
+#   docker network create ticketfilms-net
+#   docker compose -f docker-compose.rabbit.yml up -d
+#   docker compose -f docker-compose.kafka.yml up -d
 services:
-  rabbit1:
-    image: rabbitmq:3.13-management
-    container_name: rabbit1
-    hostname: rabbit1
-    environment:
-      RABBITMQ_ERLANG_COOKIE: ticketfilms-cookie
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-
-  rabbit2:
-    image: rabbitmq:3.13-management
-    container_name: rabbit2
-    hostname: rabbit2
-    depends_on:
-      rabbit1:
-        condition: service_healthy
-    environment:
-      RABBITMQ_ERLANG_COOKIE: ticketfilms-cookie
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
-    ports:
-      - "5673:5672"
-      - "15673:15672"
-    # Arranca, se une al clúster de rabbit1 y vuelve a arrancar en primer plano
-    command: >
-      bash -c "rabbitmq-server -detached &&
-      sleep 12 &&
-      rabbitmqctl stop_app &&
-      rabbitmqctl reset &&
-      rabbitmqctl join_cluster rabbit@rabbit1 &&
-      rabbitmqctl stop &&
-      sleep 3 &&
-      exec rabbitmq-server"
-
   ms-boletos:
     build: .
     container_name: ms-boletos
-    depends_on:
-      rabbit1:
-        condition: service_healthy
+    restart: on-failure
     ports:
       - "8083:8083"
     environment:
@@ -58,10 +16,13 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       COGNITO_ISSUER_URI: ${COGNITO_ISSUER_URI}
       COGNITO_USERINFO_URL: ${COGNITO_USERINFO_URL}
-      RABBITMQ_HOST: rabbit1
+      KAFKA_BOOTSTRAP_SERVERS: kafka1:29092,kafka2:29092,kafka3:29092
+      RABBITMQ_ADDRESSES: rabbit1:5672,rabbit2:5672
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
       ASIENTOS_BASE_URL: ${ASIENTOS_BASE_URL:-http://host.docker.internal:8082}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
   default:

@@ -16,13 +16,13 @@ import org.springframework.amqp.core.TopicExchange;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-// Topología de RabbitMQ en un solo lugar. Solo declara infraestructura:
-// no tiene lógica de negocio. RabbitAdmin la crea al conectarse.
+// Declara la misma topología que ms-asientos, así el productor nunca publica
+// a una cola que no existe (RabbitAdmin la crea al conectarse; es idempotente).
 //
-//  ex.tickets.eventos (topic)  --boleto.comprado-->  q.boleto.comprado.notificaciones
-//                              --compra.fallida --->  q.compra.fallida.notificaciones
-//                              --compra.fallida --->  q.compra.fallida.asientos
-//                              --reserva.expirada->  q.reserva.expirada.notificaciones
+//  ex.tickets.eventos (topic)  --boleto.comprado--> q.boleto.comprado.notificaciones
+//                              --compra.fallida --> q.compra.fallida.notificaciones
+//                              --compra.fallida --> q.compra.fallida.asientos
+//                              --reserva.expirada-> q.reserva.expirada.notificaciones
 //
 //  Cada cola tiene x-dead-letter-exchange = ex.tickets.dlx (direct) y su DLQ "<cola>.dlq".
 @Configuration

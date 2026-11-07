@@ -1,0 +1,49 @@
+# Clúster RabbitMQ de 2 nodos. Red compartida: docker network create ticketfilms-net
+# Panel: http://localhost:15672 (nodo 1) y http://localhost:15673 (nodo 2)
+services:
+  rabbit1:
+    image: rabbitmq:3.13-management
+    hostname: rabbit1
+    container_name: rabbit1
+    environment:
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-ticketfilms-cookie}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./rabbitmq/cluster.conf:/etc/rabbitmq/conf.d/20-cluster.conf:ro
+      - rabbit1-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  rabbit2:
+    image: rabbitmq:3.13-management
+    hostname: rabbit2
+    container_name: rabbit2
+    environment:
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-ticketfilms-cookie}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    volumes:
+      - ./rabbitmq/cluster.conf:/etc/rabbitmq/conf.d/20-cluster.conf:ro
+      - rabbit2-data:/var/lib/rabbitmq
+    depends_on:
+      rabbit1:
+        condition: service_healthy
+
+volumes:
+  rabbit1-data:
+  rabbit2-data:
+
+networks:
+  default:
+    name: ticketfilms-net
+    external: true

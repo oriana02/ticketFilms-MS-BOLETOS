@@ -3,8 +3,8 @@ package com.ticketfilms.ms_boletos.config;
 import java.util.List;
 
 // Único lugar donde se escriben los nombres de exchanges, colas y routing keys.
-// Publishers, listeners, la topología y la API admin usan estas constantes,
-// así un cambio de nombre se hace una sola vez.
+// DEBE ser idéntico al de ms-asientos: si los argumentos de una cola difieren,
+// RabbitMQ rechaza la redeclaración (PRECONDITION_FAILED).
 public final class RabbitTopology {
 
     private RabbitTopology() {
@@ -26,12 +26,6 @@ public final class RabbitTopology {
     public static final String Q_COMPRA_FALLIDA_NOTIFICACIONES = "q.compra.fallida.notificaciones";
     public static final String Q_COMPRA_FALLIDA_ASIENTOS = "q.compra.fallida.asientos";
     public static final String Q_RESERVA_EXPIRADA = "q.reserva.expirada.notificaciones";
-
-    // DLQ (constantes porque @RabbitListener las necesita en tiempo de compilación)
-    public static final String DLQ_BOLETO_COMPRADO = Q_BOLETO_COMPRADO + SUFIJO_DLQ;
-    public static final String DLQ_COMPRA_FALLIDA_NOTIFICACIONES = Q_COMPRA_FALLIDA_NOTIFICACIONES + SUFIJO_DLQ;
-    public static final String DLQ_COMPRA_FALLIDA_ASIENTOS = Q_COMPRA_FALLIDA_ASIENTOS + SUFIJO_DLQ;
-    public static final String DLQ_RESERVA_EXPIRADA = Q_RESERVA_EXPIRADA + SUFIJO_DLQ;
 
     public static final List<String> COLAS = List.of(
             Q_BOLETO_COMPRADO,

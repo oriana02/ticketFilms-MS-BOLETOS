@@ -1,6 +1,6 @@
 # Kafka con Zookeeper: 3 nodos Zookeeper + 3 brokers + Kafka UI (http://localhost:8090)
 # Red compartida: docker network create ticketfilms-net
-# En EC2, define KAFKA_EXTERNAL_HOST con la IP pública.
+
 x-zk: &zk
   image: confluentinc/cp-zookeeper:7.6.1
   environment: &zk-env
@@ -46,7 +46,8 @@ services:
       <<: *broker-env
       KAFKA_BROKER_ID: 1
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka1:29092,EXTERNAL://${KAFKA_EXTERNAL_HOST:-localhost}:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka1:29092,EXTERNAL://kafka1:9092
+
   kafka2:
     image: confluentinc/cp-kafka:7.6.1
     container_name: kafka2
@@ -56,7 +57,8 @@ services:
       <<: *broker-env
       KAFKA_BROKER_ID: 2
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka2:29092,EXTERNAL://${KAFKA_EXTERNAL_HOST:-localhost}:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka2:29092,EXTERNAL://kafka2:9093
+
   kafka3:
     image: confluentinc/cp-kafka:7.6.1
     container_name: kafka3
@@ -66,7 +68,7 @@ services:
       <<: *broker-env
       KAFKA_BROKER_ID: 3
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9094
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka3:29092,EXTERNAL://${KAFKA_EXTERNAL_HOST:-localhost}:9094
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka3:29092,EXTERNAL://kafka3:9094
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -75,6 +77,7 @@ services:
     ports: ["8090:8080"]
     environment:
       KAFKA_CLUSTERS_0_NAME: ticketfilms
+      # AQUÍ TAMBIÉN: apuntamos a los puertos INTERNOS de Docker
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka1:29092,kafka2:29092,kafka3:29092
 
 networks:
